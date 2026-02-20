@@ -113,7 +113,7 @@ export interface PageMetadata {
   description?: string
 }
 
-export async function bundleHTML(source: string, other_sources: FileSource[], metadata: PageMetadata): Promise<string> {
+export async function bundleHTML(source: string, other_sources: FileSource[], metadata?: PageMetadata): Promise<string> {
   const css = await generateCSS(source, other_sources);
   const js = await bundleJS(source, other_sources);
   const html = `<!DOCTYPE html>
@@ -122,7 +122,7 @@ export async function bundleHTML(source: string, other_sources: FileSource[], me
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${metadata?.title ?? 'My Page'}</title>
-    <meta name="${metadata.description || ''}">
+    <meta name="${metadata?.description || ''}">
     <style>${css}</style>
 </head>
 <body>
