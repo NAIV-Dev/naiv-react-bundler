@@ -1,6 +1,6 @@
 {
   "name": "@naiv/react-bundler",
-  "version": "0.0.4",
+  "version": "0.0.6",
   "description": "Bundle react files into single html output",
   "main": "dist/index.js",
   "scripts": {

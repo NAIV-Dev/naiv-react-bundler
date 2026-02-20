@@ -7,11 +7,18 @@ export interface FileSource {
   path: string
   content: string
 }
+export interface Config {
+  node_modules_base_path?: string
+  metadata?: {
+    title?: string
+    description?: string
+  }
+}
 
 // Generates and minifies Tailwind CSS using Tailwind v4 API
-export async function generateCSS(source: string, other_sources: FileSource[]): Promise<string> {
+export async function generateCSS(source: string, other_sources: FileSource[], config?: Config): Promise<string> {
   // Find the Tailwind base CSS file
-  const tailwind_main_css_path = path.resolve(process.cwd(), 'node_modules/tailwindcss/index.css');
+  const tailwind_main_css_path = path.resolve(config?.node_modules_base_path ?? process.cwd(), 'node_modules/tailwindcss/index.css');
   const base_css = fs.readFileSync(tailwind_main_css_path, 'utf8');
 
   // Load the design system with the base CSS
@@ -43,7 +50,7 @@ export async function generateCSS(source: string, other_sources: FileSource[]): 
 }
 
 // esbuild plugin to resolve virtual files from other_sources.
-function virtualFsPlugin(other_sources: FileSource[]): Plugin {
+function virtualFsPlugin(other_sources: FileSource[], config?: Config): Plugin {
   return {
     name: 'virtual-fs',
     setup(build) {
@@ -52,7 +59,7 @@ function virtualFsPlugin(other_sources: FileSource[]): Plugin {
         // Normalize the path relative to the current directory
         // In this simple example, we assume everything is relative to cwd
         let relative_path = path.join(args.resolveDir, args.path.replace(/^\.\//, ''));
-        relative_path = path.relative(process.cwd(), relative_path);
+        relative_path = path.relative(config?.node_modules_base_path ?? process.cwd(), relative_path);
 
         // Try to match with extensions
         const possiblePaths = [
@@ -77,7 +84,7 @@ function virtualFsPlugin(other_sources: FileSource[]): Plugin {
           return {
             contents: match.content,
             loader: args.path.endsWith('.tsx') ? 'tsx' : args.path.endsWith('.ts') ? 'ts' : 'js',
-            resolveDir: process.cwd(), // crucial for resolving node_modules
+            resolveDir: config?.node_modules_base_path ?? process.cwd(), // crucial for resolving node_modules
           };
         }
         return null;
@@ -86,12 +93,12 @@ function virtualFsPlugin(other_sources: FileSource[]): Plugin {
   };
 }
 
-export async function bundleJS(source: string, other_sources: FileSource[]): Promise<string> {
+export async function bundleJS(source: string, other_sources: FileSource[], config?: Config): Promise<string> {
   const result = await build({
     stdin: {
       contents: source,
       loader: 'tsx',
-      resolveDir: process.cwd(),
+      resolveDir: config?.node_modules_base_path ?? process.cwd(),
       sourcefile: 'index.tsx',
     },
     bundle: true,
@@ -99,7 +106,7 @@ export async function bundleJS(source: string, other_sources: FileSource[]): Pro
     write: false,
     format: 'iife',
     platform: 'browser',
-    plugins: [virtualFsPlugin(other_sources)],
+    plugins: [virtualFsPlugin(other_sources, config)],
     define: {
       'process.env.NODE_ENV': '"production"',
     },
@@ -108,21 +115,16 @@ export async function bundleJS(source: string, other_sources: FileSource[]): Pro
   return result.outputFiles ? result.outputFiles[0]?.text || '' : '';
 }
 
-export interface PageMetadata {
-  title?: string
-  description?: string
-}
-
-export async function bundleHTML(source: string, other_sources: FileSource[], metadata?: PageMetadata): Promise<string> {
-  const css = await generateCSS(source, other_sources);
-  const js = await bundleJS(source, other_sources);
+export async function bundleHTML(source: string, other_sources: FileSource[], config?: Config): Promise<string> {
+  const css = await generateCSS(source, other_sources, config);
+  const js = await bundleJS(source, other_sources, config);
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${metadata?.title ?? 'My Page'}</title>
-    <meta name="${metadata?.description || ''}">
+    <title>${config?.metadata?.title ?? 'My Page'}</title>
+    <meta name="${config?.metadata?.description || ''}">
     <style>${css}</style>
 </head>
 <body>
